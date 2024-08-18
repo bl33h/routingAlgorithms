@@ -22,12 +22,16 @@ const xmpp = client({
 
 debug(xmpp, true);
 
+xmpp.on('error', err => {
+    console.error('XMPP connection error:', err);
+});
+
 // Function to send link state messages (LSR)
 function sendLinkState(message) {
     const messageXML = xml('message', { type: 'chat', to: 'all@alumchat.lol' },
         xml('body', {}, JSON.stringify(message))
     );
-    xmpp.send(messageXML);
+    xmpp.send(messageXML).catch(err => console.error('Failed to send link state message:', err));
 }
 
 // Function to send flooding messages
@@ -35,7 +39,7 @@ function sendFlooding(message) {
     const messageXML = xml('message', { type: 'chat', to: 'all@alumchat.lol' },
         xml('body', {}, JSON.stringify(message))
     );
-    xmpp.send(messageXML);
+    xmpp.send(messageXML).catch(err => console.error('Failed to send flooding message:', err));
 }
 
 module.exports = { xmpp, sendLinkState, sendFlooding };

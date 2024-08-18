@@ -28,22 +28,27 @@ xmpp.on('online', async address => {
 });
 
 xmpp.on('stanza', async stanza => {
+    console.log('Received stanza:', stanza.toString());
     if (stanza.is('message') && stanza.type === 'chat') {
-    try {
-        const json = JSON.parse(stanza.getChildText('body'));
-        if (json && json.type === 'hello' && json.hops > 0) {
-
-            if (!messageLog[json.payload] || messageLog[json.payload] < json.hops) {
-                messageLog[json.payload] = json.hops;
-                console.log('flooding message received:', json);
-                json.hops--;
-                sendFlooding(json); 
+        try {
+            const json = JSON.parse(stanza.getChildText('body'));
+            console.log('Parsed JSON:', json);
+            if (json && json.type === 'hello' && json.hops > 0) {
+                if (!messageLog[json.payload] || messageLog[json.payload] < json.hops) {
+                    messageLog[json.payload] = json.hops;
+                    console.log('Flooding message received:', json);
+                    json.hops--;
+                    sendFlooding(json); 
+                }
             }
+        } catch (error) {
+            console.error('Failed to process incoming message:', error);
         }
-    } catch (error) {
-        console.error('!failed to process incoming message:', error);
-    }
     }
 });
+
+xmpp.start()
+    .then(() => console.log('XMPP connection started'))
+    .catch(err => console.error('Failed to start XMPP connection:', err));
 
 module.exports = xmpp;
