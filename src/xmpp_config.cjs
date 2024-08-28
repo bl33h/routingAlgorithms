@@ -10,6 +10,7 @@
 
 const { client, xml } = require('@xmpp/client');
 const debug = require('@xmpp/debug');
+const { send } = require('./link_state_routing.cjs');
 
 // Shared XMPP configuration
 const xmpp = client({
@@ -42,4 +43,23 @@ function sendFlooding(message) {
     xmpp.send(messageXML).catch(err => console.error('Failed to send flooding message:', err));
 }
 
-module.exports = { xmpp, sendLinkState, sendFlooding };
+const sendDVR = async (dvrData) => {
+    const { source, destination, distance } = dvrData;
+
+    xmpp.on('online', async address => {
+        console.log('XMPP client is online as', address.toString());
+    });
+
+    const dvrMessage = xml('message', { type: 'chat', to: `${destination}@alumchat.lol` },
+        xml('body', {}, `DVR from ${source}: Distance to ${destination} is ${distance}`)
+    );
+
+    try {
+        await xmpp.send(dvrMessage);
+        console.log(`DVR message sent from ${source} to ${destination} with distance ${distance}.`);
+    } catch (error) {
+        console.error('Error sending DVR message:', error);
+    }
+};
+
+module.exports = { xmpp, sendLinkState, sendFlooding, sendDVR };
