@@ -74,7 +74,7 @@ function iniciarAlgoritmo() {
 function enviarFlooding() {
     const message = {
         type: "flooding",
-        from: 'A', // Supón que este nodo es 'A', ajusta según tu configuración
+        from: 'A',
         hops: 0,
         payload: "Mensaje de prueba utilizando Flooding"
     };
@@ -87,10 +87,11 @@ function enviarLinkStateRouting() {
         type: 'lsr',
         payload: "Mensaje de prueba utilizando Link State Routing",
         hops: 0,
+        to: 'B',
     };
     console.log('Enviando mensaje de LSR:', lsrMessage);
     const lsr = new LinkStateRouting();
-    lsr.configure(nodos, 'A'); // Supón que este nodo es 'A'
+    lsr.configure(nodos, 'A');
     lsr.sendMessage(xmpp, lsrMessage, nombres, 'A');
 }
 
@@ -108,11 +109,11 @@ function procesarMensaje(from, message) {
             break;
         case 'lsr':
             console.log(`Link State Routing message recibido de ${msg.from}`);
-            if (msg.hops < 10) { // Evitar bucles infinitos
+            if (msg.hops < 10) {
                 const lsr = new LinkStateRouting();
                 lsr.configure(nodos, 'A');
                 console.log(`Reenviando mensaje de LSR: ${msg}`);
-                lsr.sendMessage(xmpp, msg, nombres, 'A'); // Reenviar usando LSR
+                lsr.sendMessage(xmpp, msg, nombres, 'A');
             }
             break;
         default:

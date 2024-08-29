@@ -12,13 +12,12 @@ const {xml, client} = require('@xmpp/client');
 
 class Graph {
     constructor() {
-        this.nodes = new Set();
+        this.nodes = {};
     }
 
     addNode(node) {
-        this.nodes.add(node);
+        this.nodes[node.name] = node;
     }
-    
 }
 
 class Node {
@@ -28,7 +27,7 @@ class Node {
     }
 
     addNeighbor(neighbor, distance) {
-        this.neighbors[neighbor.name] = distance;
+        this.neighbors[neighbor] = distance;
     }
 }
 
@@ -78,58 +77,85 @@ class LinkStateRouting {
      */
     configure(nodes, from){
         for (const nodeName in nodes) {
-            if (nodeName == from){
-                continue;
-            }
             const newNode = new Node(nodeName);
             const neighbors = nodes[nodeName];
             for (const neighborName in neighbors) {
-                if (neighborName == from){
-                    continue;
-                }
                 const distance = neighbors[neighborName];
                 newNode.addNeighbor(neighborName, distance);
             }
             this.graph.addNode(newNode);
         }
+        console.log('Graph configured:', this.graph.nodes);
     }
 
     getShortestPath(source, destination) {
         const distances = {};
         const previous = {};
         const queue = new PriorityQueue();
-
+        const visited = new Set();  // Set to track visited nodes
+    
+        // Initialize distances and previous nodes
         for (const nodeName in this.graph.nodes) {
             distances[nodeName] = Infinity;
             previous[nodeName] = null;
-            queue.enqueue(nodeName, Infinity);
         }
+    
         distances[source] = 0;
         queue.enqueue(source, 0);
-
+    
+        console.log(`Iniciando cálculo de rutas desde ${source} hacia ${destination}`);
+    
         while (!queue.isEmpty()) {
             const { element: currentNode } = queue.dequeue();
-
+            console.log(`Procesando nodo: ${currentNode}`);
+    
+            // If the node has been visited, skip processing
+            if (visited.has(currentNode)) {
+                console.log(`Nodo ${currentNode} ya fue visitado, saltando...`);
+                continue;
+            }
+    
+            visited.add(currentNode);
+    
+            // If the current node is the destination, break out of the loop
             if (currentNode === destination) {
+                console.log(`Llegamos al destino: ${destination}`);
                 break;
             }
-
-            for (const neighbor in this.graph.nodes[currentNode].neighbors) {
-                const alt = distances[currentNode] + this.graph.nodes[currentNode].neighbors[neighbor];
+    
+            const currentNodeData = this.graph.nodes[currentNode];
+            if (!currentNodeData) {
+                console.error(`Nodo ${currentNode} no encontrado en el grafo.`);
+                continue;
+            }
+    
+            for (const neighbor in currentNodeData.neighbors) {
+                const alt = distances[currentNode] + currentNodeData.neighbors[neighbor];
+                console.log(`Revisando vecino ${neighbor} de ${currentNode} con distancia ${alt}`);
                 if (alt < distances[neighbor]) {
                     distances[neighbor] = alt;
                     previous[neighbor] = currentNode;
                     queue.enqueue(neighbor, alt);
+                    console.log(`Actualizada distancia de ${neighbor} a ${alt}`);
                 }
             }
         }
-
+    
+        let path = [];
         let nextHop = destination;
-        while (previous[nextHop] !== source) {
+        while (nextHop !== null) {
+            path.unshift(nextHop);
             nextHop = previous[nextHop];
         }
-
-        return nextHop
+    
+        if (path.length === 1) {
+            console.error(`No se pudo encontrar un camino desde ${source} hasta ${destination}`);
+            return null;
+        }
+    
+        nextHop = path[1]; // The next node in the path
+        console.log(`Next hop de ${source} a ${destination} es ${nextHop}`);
+        return nextHop;
     }
 
     /**
@@ -140,20 +166,37 @@ class LinkStateRouting {
      * @param {*} clientName  Name of the client being used
      */
     sendMessage(xmpp, message, names, clientName){
+        // Verificar si el destino (message.to) es válido
+        if (!message.to) {
+            console.error('Error: message.to no está definido.');
+            return;
+        }
+    
+        if (!names[message.to]) {
+            console.error(`Error: No se encontró el destino ${message.to} en el mapeo de nombres.`);
+            return;
+        }
+
         message.hops += 1;
-
+    
+        // Llamar a getShortestPath con el destino validado
         const nextHop = this.getShortestPath(clientName, names[message.to]);
-
+    
+        if (!nextHop) {
+            console.error(`No se pudo encontrar el siguiente salto para ${clientName} -> ${message.to}`);
+            return;
+        }
+    
+        console.log(`Enviando mensaje desde ${clientName} hacia ${nextHop} con destino final ${message.to}`);
+    
+        // Preparar y enviar el mensaje a través de XMPP
         const messageToSend = xmpp.stanza('message', {
             to: names[nextHop],
             type: 'chat',
         }).c('body').t(JSON.stringify(message));
-
-        xmpp.send(messageToSend);
     
-    }
-
-    
+        xmpp.send(messageToSend).catch(err => console.error('Failed to send message:', err));
+    }     
 }
 
 module.exports = LinkStateRouting;
