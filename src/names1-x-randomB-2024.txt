@@ -1,0 +1,1 @@
+{"type":"names", "config":{'A': 'grupo12@alumchat.xyz', 'B': 'grupo8@alumchat.xyz', 'C': 'grupo11@alumchat.xyz', 'D': 'grupo10@alumchat.xyz', 'E': 'grupo7@alumchat.xyz', 'F': 'grupo9@alumchat.xyz'} }

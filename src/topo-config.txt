@@ -1,9 +1,0 @@
-{
-    "type": "topo",
-    "config": {
-      "men21289-test": ["node1", "node2"],
-      "node1": ["men21289-test", "node3"],
-      "node2": ["men21289-test", "node3"],
-      "node3": ["node1", "node2"]
-    }
-}  

@@ -1,9 +1,0 @@
-{
-    "type": "names",
-    "config": {
-      "men21289-test": "men21289-test@alumchat.lol",
-      "node1": "node1@alumchat.lol",
-      "node2": "node2@alumchat.lol",
-      "node3": "node3@alumchat.lol"
-    }
-}  
