@@ -1,6 +1,6 @@
 /*
-    link_state_routing.cjs
-    Implements link state routing (LSR) algorithm for the XMPP client.
+    flooding.cjs
+    Implements Flooding algorithm for the XMPP client.
 
     authors:
         - Ricardo Méndez

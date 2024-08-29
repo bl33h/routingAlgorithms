@@ -8,11 +8,12 @@
         - Melissa Pérez
 */
 
-const { client } = require('@xmpp/client');
-const debug = require('@xmpp/debug');
+const { xml } = require('@xmpp/client');
+const { xmpp, sendLinkState, sendFlooding } = require('./xmpp_config.cjs');
 const fs = require('fs');
 const path = require('path');
-const config = require('./xmpp_config.cjs');
+
+// Load configuration files
 const topoConfigPath = path.join(__dirname, 'topo1-x-randomB-2024.txt');
 const namesConfigPath = path.join(__dirname, 'names1-x-randomB-2024.txt');
 
@@ -25,19 +26,10 @@ const nombres = namesConfig.config;
 console.log('Configuración de nodos:', nodos);
 console.log('Configuración de nombres:', nombres);
 
-// Create XMPP client
-const xmpp = client({
-    service: `xmpp://${config.host}:${config.port}`,
-    domain: config.host,
-    resource: 'bot',
-    username: config.jid.split('@')[0],
-    password: config.password,
-});
-
 // Event when the client is online
 xmpp.on('online', async (address) => {
     console.log(`Conectado como ${address.toString()}`);
-    enviarMensajeHello();
+    iniciarAlgoritmo();
 });
 
 // Entering messages
@@ -48,6 +40,12 @@ xmpp.on('stanza', async (stanza) => {
         if (message) {
             procesarMensaje(from, message);
         }
+    } else if (stanza.is('iq') && stanza.attrs.type === 'get') {
+        // Handle IQ requests and respond with an empty response
+        const iqResponse = xml('iq', { type: 'result', id: stanza.attrs.id, to: stanza.attrs.from });
+        xmpp.send(iqResponse).catch(err => {
+            console.error('Error sending IQ response:', err);
+        });
     }
 });
 
@@ -59,29 +57,37 @@ xmpp.on('error', (err) => {
 // Start connection
 xmpp.start().catch(console.error);
 
-function enviarMensajeHello() {
-    const vecinos = nodos[config.nodeID];
-    vecinos.forEach(async (vecino) => {
-        const destino = nombres[vecino];
-        const mensaje = {
-            type: "hello",
-            from: config.jid,
-            to: destino,
-            hops: 0,
-            headers: [],
-            payload: "Hola desde " + config.jid,
-        };
-        await enviarMensaje(destino, mensaje);
-    });
+function iniciarAlgoritmo() {
+    const algoritmo = process.argv[2];
+
+    switch (algoritmo) {
+        case 'flooding':
+            console.log('Iniciando algoritmo Flooding...');
+            enviarFlooding();
+            break;
+        case 'lsr':
+            console.log('Iniciando algoritmo Link State Routing...');
+            enviarLinkStateRouting();
+            break;
+        default:
+            console.log('Algoritmo no reconocido. Use "flooding" o "lsr".');
+            process.exit(1);
+    }
 }
 
-async function enviarMensaje(destino, mensaje) {
-    const message = xmpp.stanza('message', {
-        to: destino,
-        type: 'chat',
-    }).c('body').t(JSON.stringify(mensaje));
-    
-    await xmpp.send(message);
+function enviarFlooding() {
+    const message = "Mensaje de prueba utilizando Flooding";
+    const fromNode = 'A'; // Supón que este nodo es 'A', ajusta según tu configuración
+    sendFlooding(fromNode, Object.keys(nodos), message);
+}
+
+function enviarLinkStateRouting() {
+    const lsrMessage = {
+        type: 'lsr',
+        payload: "Mensaje de prueba utilizando Link State Routing",
+        hops: 0,
+    };
+    sendLinkState(lsrMessage);
 }
 
 function procesarMensaje(from, message) {
@@ -98,6 +104,14 @@ function procesarMensaje(from, message) {
         case 'info':
             actualizarTabla(msg.payload);
             break;
+        case 'flooding':
+            console.log(`Flooding message recibido de ${msg.from}`);
+            // Posible lógica adicional para manejar flooding
+            break;
+        case 'lsr':
+            console.log(`Link State Routing message recibido de ${msg.from}`);
+            // Posible lógica adicional para manejar LSR
+            break;
         default:
             console.log('Tipo de mensaje no reconocido:', msg.type);
     }
@@ -106,20 +120,17 @@ function procesarMensaje(from, message) {
 function enviarEcho(destino) {
     const mensaje = {
         type: "echo",
-        from: config.jid,
+        from: 'A',
         to: destino,
         hops: 1,
         headers: [],
-        payload: "Echo desde " + config.jid,
+        payload: "Echo desde " + 'A',
     };
-    enviarMensaje(destino, mensaje);
+    sendFlooding('A', [destino], JSON.stringify(mensaje));
 }
 
 function actualizarTabla(info) {
     console.log('Actualizando tabla con:', info);
 }
 
-// Función para obtener todos los nodos disponibles en la red, excepto el nodo emisor
-function getAllNodes(excludeNodeID) {
-    return Object.keys(nombres).filter(nodeID => nodeID !== excludeNodeID);
-}
+module.exports = { iniciarAlgoritmo, procesarMensaje };
