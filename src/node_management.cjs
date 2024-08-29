@@ -10,13 +10,20 @@
 
 const { client } = require('@xmpp/client');
 const debug = require('@xmpp/debug');
+const fs = require('fs');
+const path = require('path');
 const config = require('./xmpp_config.cjs');
-const topoConfig = require('./topo1-x-randomA-2024.json');
-const namesConfig = require('./names1-x-randomA-2024.json');
+const topoConfigPath = path.join(__dirname, 'topo1-x-randomB-2024.txt');
+const namesConfigPath = path.join(__dirname, 'names1-x-randomB-2024.txt');
 
-// Load configuration
+const topoConfig = JSON.parse(fs.readFileSync(topoConfigPath, 'utf8'));
+const namesConfig = JSON.parse(fs.readFileSync(namesConfigPath, 'utf8'));
+
 const nodos = topoConfig.config;
 const nombres = namesConfig.config;
+
+console.log('Configuración de nodos:', nodos);
+console.log('Configuración de nombres:', nombres);
 
 // Create XMPP client
 const xmpp = client({
@@ -110,18 +117,4 @@ function enviarEcho(destino) {
 
 function actualizarTabla(info) {
     console.log('Actualizando tabla con:', info);
-}
-
-switch (config.algorithm) {
-    case 'flooding':
-        require('./flooding.cjs');
-        break;
-    case 'link_state':
-        require('./link_state_routing.cjs');
-        break;
-    case 'distance_vector':
-        require('./distance_vector_routing.cjs');
-        break;
-    default:
-        console.error('Algoritmo no reconocido:', config.algorithm);
 }
