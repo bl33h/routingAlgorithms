@@ -8,26 +8,31 @@
         - Melissa Pérez
 */
 
-const { sendMessage } = require('./xmpp_config.cjs');
-const { getAllNodes } = require('./node_management.cjs');
-const config = require('./xmpp_config.cjs');
+const { xmpp, sendMessage } = require('./xmpp_config.cjs');
 
-// function to get all nodes except the sender and send them the flooding message
-function startFlooding(excludeNodeID, message) {
-    const allNodesExceptSelf = getAllNodes(excludeNodeID);
+function getAllNodes(excludeNodeID, names) {
+    if (!names) {
+        console.error('Error: names es undefined o null!');
+        return [];
+    }
+    return Object.keys(names).filter(nodeID => nodeID !== excludeNodeID);
+}
+
+function startFlooding(excludeNodeID, message, names) {
+    console.log('names recibido en startFlooding:', names);
+    const allNodesExceptSelf = getAllNodes(excludeNodeID, names);
     allNodesExceptSelf.forEach(nodeID => {
-        const destinationJID = config.names[nodeID];
+        const destinationJID = names[nodeID];
         const floodingMessage = {
             type: "flooding",
-            from: config.jid,   // sender
-            to: destinationJID, // recipient
-            hops: 0,
+            from: message.from,
+            to: destinationJID,
+            hops: message.hops + 1,
             headers: [],
-            payload: message,
+            payload: message.payload,
         };
         sendMessage(destinationJID, floodingMessage);
     });
 }
 
-// export the startFlooding function for use in other parts of the application
 module.exports = { startFlooding };

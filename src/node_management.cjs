@@ -8,12 +8,13 @@
         - Melissa Pérez
 */
 
-const { xml } = require('@xmpp/client');
-const { xmpp, sendLinkState, sendFlooding } = require('./xmpp_config.cjs');
+const { xmpp, sendMessage } = require('./xmpp_config.cjs');
 const fs = require('fs');
 const path = require('path');
+const LinkStateRouting = require('./link_state_routing.cjs');
+const { startFlooding } = require('./flooding.cjs');
 
-// Load configuration files
+// Cargar archivos de configuración
 const topoConfigPath = path.join(__dirname, 'topo1-x-randomB-2024.txt');
 const namesConfigPath = path.join(__dirname, 'names1-x-randomB-2024.txt');
 
@@ -26,35 +27,30 @@ const nombres = namesConfig.config;
 console.log('Configuración de nodos:', nodos);
 console.log('Configuración de nombres:', nombres);
 
-// Event when the client is online
+// Evento cuando el cliente está en línea
 xmpp.on('online', async (address) => {
     console.log(`Conectado como ${address.toString()}`);
     iniciarAlgoritmo();
 });
 
-// Entering messages
+// Manejo de mensajes entrantes
 xmpp.on('stanza', async (stanza) => {
     if (stanza.is('message')) {
         const from = stanza.attrs.from;
         const message = stanza.getChildText('body');
         if (message) {
+            console.log('Mensaje recibido:', message);
             procesarMensaje(from, message);
         }
-    } else if (stanza.is('iq') && stanza.attrs.type === 'get') {
-        // Handle IQ requests and respond with an empty response
-        const iqResponse = xml('iq', { type: 'result', id: stanza.attrs.id, to: stanza.attrs.from });
-        xmpp.send(iqResponse).catch(err => {
-            console.error('Error sending IQ response:', err);
-        });
     }
 });
 
-// Error handling
+// Manejo de errores
 xmpp.on('error', (err) => {
     console.error('Error en la conexión:', err);
 });
 
-// Start connection
+// Iniciar conexión
 xmpp.start().catch(console.error);
 
 function iniciarAlgoritmo() {
@@ -76,9 +72,14 @@ function iniciarAlgoritmo() {
 }
 
 function enviarFlooding() {
-    const message = "Mensaje de prueba utilizando Flooding";
-    const fromNode = 'A'; // Supón que este nodo es 'A', ajusta según tu configuración
-    sendFlooding(fromNode, Object.keys(nodos), message);
+    const message = {
+        type: "flooding",
+        from: 'A', // Supón que este nodo es 'A', ajusta según tu configuración
+        hops: 0,
+        payload: "Mensaje de prueba utilizando Flooding"
+    };
+    console.log('Enviando mensaje de Flooding:', message);
+    startFlooding('A', message, nombres);
 }
 
 function enviarLinkStateRouting() {
@@ -87,50 +88,36 @@ function enviarLinkStateRouting() {
         payload: "Mensaje de prueba utilizando Link State Routing",
         hops: 0,
     };
-    sendLinkState(lsrMessage);
+    console.log('Enviando mensaje de LSR:', lsrMessage);
+    const lsr = new LinkStateRouting();
+    lsr.configure(nodos, 'A'); // Supón que este nodo es 'A'
+    lsr.sendMessage(xmpp, lsrMessage, nombres, 'A');
 }
 
 function procesarMensaje(from, message) {
     const msg = JSON.parse(message);
-    console.log(`Mensaje recibido de ${from}:`, msg);
+    console.log(`Procesando mensaje de ${from}:`, msg);
 
     switch (msg.type) {
-        case 'hello':
-            enviarEcho(msg.from);
-            break;
-        case 'echo':
-            console.log(`ECHO recibido de ${msg.from}`);
-            break;
-        case 'info':
-            actualizarTabla(msg.payload);
-            break;
         case 'flooding':
             console.log(`Flooding message recibido de ${msg.from}`);
-            // Posible lógica adicional para manejar flooding
+            if (msg.hops < 10) {
+                console.log(`Reenviando mensaje de Flooding: ${msg}`);
+                startFlooding('A', msg, nombres);
+            }
             break;
         case 'lsr':
             console.log(`Link State Routing message recibido de ${msg.from}`);
-            // Posible lógica adicional para manejar LSR
+            if (msg.hops < 10) { // Evitar bucles infinitos
+                const lsr = new LinkStateRouting();
+                lsr.configure(nodos, 'A');
+                console.log(`Reenviando mensaje de LSR: ${msg}`);
+                lsr.sendMessage(xmpp, msg, nombres, 'A'); // Reenviar usando LSR
+            }
             break;
         default:
             console.log('Tipo de mensaje no reconocido:', msg.type);
     }
-}
-
-function enviarEcho(destino) {
-    const mensaje = {
-        type: "echo",
-        from: 'A',
-        to: destino,
-        hops: 1,
-        headers: [],
-        payload: "Echo desde " + 'A',
-    };
-    sendFlooding('A', [destino], JSON.stringify(mensaje));
-}
-
-function actualizarTabla(info) {
-    console.log('Actualizando tabla con:', info);
 }
 
 module.exports = { iniciarAlgoritmo, procesarMensaje };
