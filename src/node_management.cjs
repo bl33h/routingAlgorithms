@@ -118,3 +118,8 @@ function enviarEcho(destino) {
 function actualizarTabla(info) {
     console.log('Actualizando tabla con:', info);
 }
+
+// Función para obtener todos los nodos disponibles en la red, excepto el nodo emisor
+function getAllNodes(excludeNodeID) {
+    return Object.keys(nombres).filter(nodeID => nodeID !== excludeNodeID);
+}

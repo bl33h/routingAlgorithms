@@ -35,12 +35,24 @@ function sendLinkState(message) {
     xmpp.send(messageXML).catch(err => console.error('Failed to send link state message:', err));
 }
 
-// Function to send flooding messages
-function sendFlooding(message) {
-    const messageXML = xml('message', { type: 'chat', to: 'all@alumchat.lol' },
-        xml('body', {}, JSON.stringify(message))
-    );
-    xmpp.send(messageXML).catch(err => console.error('Failed to send flooding message:', err));
+// // Function to send flooding messages
+// function sendFlooding(message) {
+//     const messageXML = xml('message', { type: 'chat', to: 'all@alumchat.lol' },
+//         xml('body', {}, JSON.stringify(message))
+//     );
+//     xmpp.send(messageXML).catch(err => console.error('Failed to send flooding message:', err));
+// }
+
+// function to send flooding messages
+function sendFlooding(from, nodes, message) {
+    nodes.forEach(node => {
+        if (node !== from) {
+            const messageXML = xml('message', { type: 'chat', to: `${node}@alumchat.lol` },
+                xml('body', {}, message)
+            );
+            xmpp.send(messageXML).catch(err => console.error('Failed to send flooding message:', err));
+        }
+    });
 }
 
 const sendDVR = async (dvrData) => {
