@@ -155,7 +155,7 @@ class LinkStateRouting {
     
         nextHop = path[1]; // The next node in the path
         console.log(`Next hop de ${source} a ${destination} es ${nextHop}`);
-        return nextHop;
+        return {nextHop, isDestination: nextHop === destination};
     }
 
     /**
@@ -180,7 +180,7 @@ class LinkStateRouting {
         message.hops += 1;
     
         // Llamar a getShortestPath con el destino validado
-        const nextHop = this.getShortestPath(clientName, names[message.to]);
+        const {nextHop, isDestination} = this.getShortestPath(clientName, names[message.to]);
     
         if (!nextHop) {
             console.error(`No se pudo encontrar el siguiente salto para ${clientName} -> ${message.to}`);
@@ -188,12 +188,31 @@ class LinkStateRouting {
         }
     
         console.log(`Enviando mensaje desde ${clientName} hacia ${nextHop} con destino final ${message.to}`);
-    
-        // Preparar y enviar el mensaje a través de XMPP
-        const messageToSend = xmpp.stanza('message', {
-            to: names[nextHop],
-            type: 'chat',
-        }).c('body').t(JSON.stringify(message));
+        let messageToSend;
+        if (isDestination){
+            messageToSend= xml(
+                'message', 
+                { 
+                  to: receivedMessage.to,
+                  from: receivedMessage.from,
+                  type: 'chat' 
+                },
+                xml('body', {}, receivedMessage.payload), // Cuerpo del mensaje con el contenido del payload
+                xml('type', {}, receivedMessage.type),    // Tipo de mensaje
+                xml('hops', {}, receivedMessage.hops.toString()), // Hops como texto
+                ...receivedMessage.headers.map(header => {
+                  // Añadir cada header como un nodo XML
+                  const [key, value] = Object.entries(header)[0];
+                  return xml('header', { name: key }, value);
+                })
+              );
+        }
+        else{
+            messageToSend = xmpp.stanza('message', {
+                to: names[nextHop],
+                type: 'chat',
+            }).c('body').t(JSON.stringify(message));
+        }
     
         xmpp.send(messageToSend).catch(err => console.error('Failed to send message:', err));
     }     
