@@ -8,7 +8,7 @@
         - Melissa Pérez
 */
 
-const { xmpp, sendMessage } = require('./xmpp_config.cjs');
+const { xmpp } = require('./xmpp_config.cjs');
 const fs = require('fs');
 const path = require('path');
 const LinkStateRouting = require('./link_state_routing.cjs');
@@ -96,28 +96,36 @@ function enviarLinkStateRouting() {
 }
 
 function procesarMensaje(from, message) {
-    const msg = JSON.parse(message);
-    console.log(`Procesando mensaje de ${from}:`, msg);
+    try {
+        const msg = JSON.parse(message);
+        console.log(`Procesando mensaje de ${from}:`, msg);
 
-    switch (msg.type) {
-        case 'flooding':
-            console.log(`Flooding message recibido de ${msg.from}`);
-            if (msg.hops < 10) {
-                console.log(`Reenviando mensaje de Flooding: ${msg}`);
-                startFlooding('A', msg, nombres);
-            }
-            break;
-        case 'lsr':
-            console.log(`Link State Routing message recibido de ${msg.from}`);
-            if (msg.hops < 10) {
-                const lsr = new LinkStateRouting();
-                lsr.configure(nodos, 'A');
-                console.log(`Reenviando mensaje de LSR: ${msg}`);
-                lsr.sendMessage(xmpp, msg, nombres, 'A');
-            }
-            break;
-        default:
-            console.log('Tipo de mensaje no reconocido:', msg.type);
+        switch (msg.type) {
+            case 'flooding':
+                console.log(`Flooding message recibido de ${msg.from}`);
+                if (msg.hops < 10) {
+                    console.log(`Reenviando mensaje de Flooding: ${msg}`);
+                    startFlooding(msg.from, msg, nombres);
+                } else {
+                    console.log(`Mensaje de Flooding ha alcanzado el número máximo de hops: ${msg}`);
+                }
+                break;
+            case 'lsr':
+                console.log(`Link State Routing message recibido de ${msg.from}`);
+                if (msg.hops < 10) {
+                    const lsr = new LinkStateRouting();
+                    lsr.configure(nodos, 'A');
+                    console.log(`Reenviando mensaje de LSR: ${msg}`);
+                    lsr.sendMessage(xmpp, msg, nombres, 'A');
+                } else {
+                    console.log(`Mensaje de LSR ha alcanzado el número máximo de hops: ${msg}`);
+                }
+                break;
+            default:
+                console.log('Tipo de mensaje no reconocido:', msg.type);
+        }
+    } catch (error) {
+        console.error('Error al procesar el mensaje:', error);
     }
 }
 
