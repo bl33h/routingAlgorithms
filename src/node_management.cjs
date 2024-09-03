@@ -121,6 +121,16 @@ xmpp.on('online', address => {
     }
 });
 
+xmpp.on('stanza', stanza => {
+    if (stanza.is('message')) {
+        const message = stanza.getChildText('body');
+        if (message) {
+            const from = stanza.attrs.from;
+            console.log(`Mensaje recibido de ${from}: ${message}`);
+        }
+    }
+});
+
 xmpp.on('error', err => {
     console.error('Error en la conexión XMPP:', err);
 });
