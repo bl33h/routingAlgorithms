@@ -75,7 +75,7 @@ class LinkStateRouting {
      * @param {*} nodes JSON object with the nodes and their neighbors
      * @param {*} from Name of the node that sends the message
      */
-    configure(nodes, from){
+    configure(nodes){
         for (const nodeName in nodes) {
             const newNode = new Node(nodeName);
             const neighbors = nodes[nodeName];
@@ -128,6 +128,7 @@ class LinkStateRouting {
                 console.error(`Nodo ${currentNode} no encontrado en el grafo.`);
                 continue;
             }
+
     
             for (const neighbor in currentNodeData.neighbors) {
                 const alt = distances[currentNode] + currentNodeData.neighbors[neighbor];
@@ -139,14 +140,18 @@ class LinkStateRouting {
                     console.log(`Actualizada distancia de ${neighbor} a ${alt}`);
                 }
             }
+
         }
     
         let path = [];
         let nextHop = destination;
+        console.log("entro")
         while (nextHop !== null) {
             path.unshift(nextHop);
             nextHop = previous[nextHop];
         }
+
+        console.log("salio")
     
         if (path.length === 1) {
             console.error(`No se pudo encontrar un camino desde ${source} hasta ${destination}`);
@@ -171,11 +176,6 @@ class LinkStateRouting {
             console.error('Error: message.to no está definido.');
             return;
         }
-    
-        if (!names[message.to]) {
-            console.error(`Error: No se encontró el destino ${message.to} en el mapeo de nombres.`);
-            return;
-        }
 
         message.hops += 1;
     
@@ -188,33 +188,18 @@ class LinkStateRouting {
         }
     
         console.log(`Enviando mensaje desde ${clientName} hacia ${nextHop} con destino final ${message.to}`);
-        let messageToSend;
-        if (isDestination){
-            messageToSend= xml(
-                'message', 
-                { 
-                  to: receivedMessage.to,
-                  from: receivedMessage.from,
-                  type: 'chat' 
-                },
-                xml('body', {}, receivedMessage.payload), // Cuerpo del mensaje con el contenido del payload
-                xml('type', {}, receivedMessage.type),    // Tipo de mensaje
-                xml('hops', {}, receivedMessage.hops.toString()), // Hops como texto
-                ...receivedMessage.headers.map(header => {
-                  // Añadir cada header como un nodo XML
-                  const [key, value] = Object.entries(header)[0];
-                  return xml('header', { name: key }, value);
-                })
-              );
-        }
-        else{
-            messageToSend = xmpp.stanza('message', {
-                to: names[nextHop],
-                type: 'chat',
-            }).c('body').t(JSON.stringify(message));
+        const messageToSend = {
+            type: "lsr",
+            from: clientName,
+            to: names[nextHop],
+            hops: message.hops,
+            headers: message.headers,
+            payload: message.payload,
         }
     
-        xmpp.send(messageToSend).catch(err => console.error('Failed to send message:', err));
+        xmpp.send(
+            xml("message", { to: message.to }, xml("body", {}, JSON.stringify(messageToSend)))
+        ).catch(err => console.error('Failed to send message:', err));
     }     
 }
 

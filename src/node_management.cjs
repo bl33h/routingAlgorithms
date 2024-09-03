@@ -96,21 +96,35 @@ function promptSend() {
 }
 
 function enviarMensaje(from, to, message) {
-    const msg = {
-        type: algorithm,
-        from: from,
-        to: to,
-        hops: 0,
-        payload: message
-    };
-    if (algorithm === 'flooding') {
-        startFlooding(from, msg, nombres);
-    } else if (algorithm === 'lsr') {
-        const lsr = new LinkStateRouting();
-        lsr.configure(nodos, from);
-        lsr.sendMessage(xmpp, msg, nombres, from);
-    }
-    console.log(`Mensaje enviado a ${to}: ${message}`);
+    rl.question('¿Desea usar Link State Routing (L) o Flooding (F)? (L/F): ', algorithm => {
+        if (algorithm.toUpperCase() === 'L') {
+            const messageToSend = {
+                type: "lsr",
+                from,
+                to: to,
+                hops: 0,
+                headers: [],
+                payload: message,
+            }
+            const linkStateRouting = new LinkStateRouting();
+            linkStateRouting.configure(nodos)
+            linkStateRouting.sendMessage(xmpp, messageToSend, nombres, currentNodo);
+        } else if (algorithm.toUpperCase() === 'F') {
+            const message = {
+                type: "flooding",
+                from,
+                to: nombres[to],
+                hops: 0,
+                payload: message,
+            }
+            startFlooding(xmpp, from, to, message);
+        } else {
+            console.log('Opción no reconocida.');
+            promptAction();
+        }
+
+        console.log(`Mensaje enviado a ${to}: ${message}`);
+    });
 }
 
 // Evento online solo establece el cliente online, no invoca acciones directas
@@ -124,9 +138,20 @@ xmpp.on('online', address => {
 xmpp.on('stanza', stanza => {
     if (stanza.is('message')) {
         const message = stanza.getChildText('body');
-        if (message) {
+        message = JSON.parse(message);
+        if (message.to == nombres[currentNodo]) {
             const from = stanza.attrs.from;
-            console.log(`Mensaje recibido de ${from}: ${message}`);
+            console.log(`Mensaje recibido de ${from} con payload ${message.payload}`);
+        }
+        else{
+            if(message.type == "lsr"){
+                const linkStateRouting = new LinkStateRouting();
+                linkStateRouting.configure(nodos)
+                linkStateRouting.sendMessage(xmpp, message, nombres, currentNodo);
+            }
+            else if(message.type == "flooding"){
+                startFlooding(xmpp, message.from, message.to, message);
+            }
         }
     }
 });
