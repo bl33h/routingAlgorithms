@@ -148,7 +148,9 @@ class LinkStateRouting {
         console.log("entro")
         while (nextHop !== null) {
             path.unshift(nextHop);
+            console.log(path)
             nextHop = previous[nextHop];
+            console.log(nextHop)
         }
 
         console.log("salio")
@@ -180,7 +182,7 @@ class LinkStateRouting {
         message.hops += 1;
     
         // Llamar a getShortestPath con el destino validado
-        const {nextHop, isDestination} = this.getShortestPath(clientName, names[message.to]);
+        const {nextHop, isDestination} = this.getShortestPath(clientName, message.to);
     
         if (!nextHop) {
             console.error(`No se pudo encontrar el siguiente salto para ${clientName} -> ${message.to}`);
@@ -191,15 +193,18 @@ class LinkStateRouting {
         const messageToSend = {
             type: "lsr",
             from: clientName,
-            to: names[nextHop],
+            to: message.to,
             hops: message.hops,
             headers: message.headers,
             payload: message.payload,
         }
     
         xmpp.send(
-            xml("message", { to: message.to }, xml("body", {}, JSON.stringify(messageToSend)))
+            xml("message", { to: names[nextHop] }, xml("body", {}, JSON.stringify(messageToSend)))
         ).catch(err => console.error('Failed to send message:', err));
+
+        console.log(`Mensaje enviado a ${nextHop}: ${messageToSend}`);
+        
     }     
 }
 

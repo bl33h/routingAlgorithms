@@ -9,11 +9,11 @@
 */
 
 const readline = require('readline');
-const { xmpp } = require('./xmpp_config.cjs');
 const fs = require('fs');
 const path = require('path');
 const LinkStateRouting = require('./link_state_routing.cjs');
 const { startFlooding } = require('./flooding.cjs');
+const { client, xml } = require('@xmpp/client');
 
 // Cargar archivos de configuración
 const topoConfigPath = path.join(__dirname, 'topo1-x-randomB-2024.txt');
@@ -26,8 +26,10 @@ const nodos = topoConfig.config;
 const nombres = namesConfig.config;
 
 let algorithm;
+let xmpp;
 let currentNodo = '';
 let isNodeSelected = false;
+let listen = false;
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -38,18 +40,44 @@ console.log('Configuración de nodos:', nodos);
 console.log('Configuración de nombres:', nombres);
 
 // Función para inicializar la conexión XMPP con el nodo seleccionado
-function initXMPPConnection(resource) {
-    xmpp.options.resource = resource;
+function initXMPPConnection(node = 'A') {
+    user = nombres[node].split('@')[0];
+
+    xmpp = client({
+        service: 'ws://alumchat.lol:7070/ws/',
+        domain: 'alumchat.lol',
+        resource: '',
+        username: user,
+        password: '123'
+    });
+
     xmpp.start().catch(err => {
         console.error('Error al iniciar la conexión XMPP:', err);
     });
+
+    // Evento online solo establece el cliente online, no invoca acciones directas
+    xmpp.on('online', address => {
+        console.log(`Inicialmente conectado como ${address.toString()}`);
+        if (isNodeSelected) {
+            promptAction();
+        }
+    });
+
+    xmpp.on('error', err => {
+        console.error('Error en la conexión XMPP:', err);
+    });
+
 }
 
 // Función para reiniciar la conexión XMPP con el recurso seleccionado
 function restartXMPPWithResource(resource) {
+    initXMPPConnection(resource);
+}
+
+function stopXMPPConnection() {
     xmpp.stop().then(() => {
         console.log('Cliente XMPP detenido correctamente.');
-        initXMPPConnection(resource);
+        rl.close();
     }).catch(err => {
         console.error('Error al detener la conexión XMPP:', err);
     });
@@ -74,6 +102,7 @@ function promptAction() {
             promptSend();
         } else if (action.toUpperCase() === 'R') {
             console.log('Listo para recibir mensajes. Espere...');
+            listen = true;
         } else {
             console.log('Opción no reconocida.');
             promptAction();
@@ -122,43 +151,35 @@ function enviarMensaje(from, to, message) {
             console.log('Opción no reconocida.');
             promptAction();
         }
-
-        console.log(`Mensaje enviado a ${to}: ${message}`);
     });
 }
 
-// Evento online solo establece el cliente online, no invoca acciones directas
-xmpp.on('online', address => {
-    console.log(`Inicialmente conectado como ${address.toString()}`);
-    if (isNodeSelected) {
-        promptAction();
-    }
-});
-
-xmpp.on('stanza', stanza => {
-    if (stanza.is('message')) {
-        const message = stanza.getChildText('body');
-        message = JSON.parse(message);
-        if (message.to == nombres[currentNodo]) {
-            const from = stanza.attrs.from;
-            console.log(`Mensaje recibido de ${from} con payload ${message.payload}`);
-        }
-        else{
-            if(message.type == "lsr"){
-                const linkStateRouting = new LinkStateRouting();
-                linkStateRouting.configure(nodos)
-                linkStateRouting.sendMessage(xmpp, message, nombres, currentNodo);
+if (listen){
+    xmpp.on('stanza', stanza => {
+        if (stanza.is('message')) {
+            let message = stanza.getChildText('body');
+            message = JSON.parse(message);
+            console.log('Mensaje recibido:', message);  
+            if (message.to == nombres[currentNodo]) {
+                const from = stanza.attrs.from;
+                console.log(`Mensaje recibido de ${from} con payload ${message.payload}`);
             }
-            else if(message.type == "flooding"){
-                startFlooding(xmpp, message.from, message.to, message);
+            else{
+                if(message.type == "lsr"){
+                    const linkStateRouting = new LinkStateRouting();
+                    linkStateRouting.configure(nodos)
+                    linkStateRouting.sendMessage(xmpp, message, nombres, currentNodo);
+                    stopXMPPConnection();
+                }
+                else if(message.type == "flooding"){
+                    startFlooding(xmpp, message.from, message.to, message);
+                }
             }
         }
-    }
-});
+    });
+}
 
-xmpp.on('error', err => {
-    console.error('Error en la conexión XMPP:', err);
-});
+
 
 // Asegurar que solo se inicia si no se ha seleccionado un nodo
 if (!isNodeSelected) {
