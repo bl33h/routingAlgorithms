@@ -8,6 +8,7 @@
         - Melissa Pérez
 */
 
+const readline = require('readline');
 const { xmpp } = require('./xmpp_config.cjs');
 const fs = require('fs');
 const path = require('path');
@@ -25,119 +26,106 @@ const nodos = topoConfig.config;
 const nombres = namesConfig.config;
 
 let algorithm;
+let currentNodo = '';
+let isNodeSelected = false;
+
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
 
 console.log('Configuración de nodos:', nodos);
 console.log('Configuración de nombres:', nombres);
 
-// Evento cuando el cliente está en línea
-xmpp.on('online', async (address) => {
-    console.log(`Conectado como ${address.toString()}`);
-    iniciarAlgoritmo();
-});
-
-// Manejo de mensajes entrantes
-xmpp.on('stanza', async (stanza) => {
-    if (stanza.is('message')) {
-        const from = stanza.attrs.from;
-        const message = stanza.getChildText('body');
-        const to = stanza.attrs.to;
-        if (message) {
-            console.log('Mensaje recibido:', message);
-            procesarMensaje(from, message, to);
-        }
-    }
-});
-
-// Manejo de errores
-xmpp.on('error', (err) => {
-    console.error('Error en la conexión:', err);
-});
-
-// Iniciar conexión
-xmpp.start().catch(console.error);
-
-function iniciarAlgoritmo() {
-    const algoritmo = process.argv[2];
-    algorithm = algoritmo;
-
-    switch (algoritmo) {
-        case 'flooding':
-            console.log('Iniciando algoritmo Flooding...');
-            enviarFlooding();
-            break;
-        case 'lsr':
-            console.log('Iniciando algoritmo Link State Routing...');
-            enviarLinkStateRouting();
-            break;
-        default:
-            console.log('Algoritmo no reconocido. Use "flooding" o "lsr".');
-            process.exit(1);
-    }
+// Función para inicializar la conexión XMPP con el nodo seleccionado
+function initXMPPConnection(resource) {
+    xmpp.options.resource = resource;
+    xmpp.start().catch(err => {
+        console.error('Error al iniciar la conexión XMPP:', err);
+    });
 }
 
-function enviarFlooding() {
-    const message = {
-        type: "flooding",
-        from: 'A',
+// Función para reiniciar la conexión XMPP con el recurso seleccionado
+function restartXMPPWithResource(resource) {
+    xmpp.stop().then(() => {
+        console.log('Cliente XMPP detenido correctamente.');
+        initXMPPConnection(resource);
+    }).catch(err => {
+        console.error('Error al detener la conexión XMPP:', err);
+    });
+}
+
+function promptNodo() {
+    rl.question('Seleccione un nodo (A-F): ', nodo => {
+        if (nombres.hasOwnProperty(nodo.toUpperCase())) {
+            currentNodo = nodo.toUpperCase();
+            isNodeSelected = true;
+            restartXMPPWithResource(currentNodo);
+        } else {
+            console.log('Nodo no válido, intente nuevamente.');
+            promptNodo();
+        }
+    });
+}
+
+function promptAction() {
+    rl.question('\n¿Desea enviar (E) o recibir (R) un mensaje? (E/R): ', action => {
+        if (action.toUpperCase() === 'E') {
+            promptSend();
+        } else if (action.toUpperCase() === 'R') {
+            console.log('Listo para recibir mensajes. Espere...');
+        } else {
+            console.log('Opción no reconocida.');
+            promptAction();
+        }
+    });
+}
+
+function promptSend() {
+    rl.question('\nIntroduzca el nodo destinatario (A-F): ', to => {
+        if (nombres.hasOwnProperty(to.toUpperCase())) {
+            rl.question('Introduzca el mensaje: ', message => {
+                enviarMensaje(currentNodo, to.toUpperCase(), message);
+                promptAction();
+            });
+        } else {
+            console.log('Nodo no válido, intente nuevamente.');
+            promptSend();
+        }
+    });
+}
+
+function enviarMensaje(from, to, message) {
+    const msg = {
+        type: algorithm,
+        from: from,
+        to: to,
         hops: 0,
-        payload: "Mensaje de prueba utilizando Flooding"
+        payload: message
     };
-    console.log('Enviando mensaje de Flooding:', message);
-    startFlooding('A', message, nombres);
-}
-
-function enviarLinkStateRouting() {
-    const lsrMessage = {
-        type: 'lsr',
-        payload: "Mensaje de prueba utilizando Link State Routing",
-        hops: 0,
-        to: 'B',
-    };
-    console.log('Enviando mensaje de LSR:', lsrMessage);
-    const lsr = new LinkStateRouting();
-    lsr.configure(nodos, 'A');
-    lsr.sendMessage(xmpp, lsrMessage, nombres, 'A');
-}
-
-function procesarMensaje(from, message, to) {
-    try {
-        if (to == xmpp.jid.local) {
-            console.log(`Mensaje para mí: ${message}`);
-            return;
-        }
-        else{
-            const msg = JSON.parse(message);
-            console.log(`Procesando mensaje de ${from}:`, msg);
-            
-            switch (algorithm) {
-                case '1':
-                    console.log(`Flooding message recibido de ${msg.from}`);
-                    if (msg.hops < 10) {
-                        console.log(`Reenviando mensaje de Flooding: ${msg}`);
-                        startFlooding(msg.from, msg, nombres);
-                    } else {
-                        console.log(`Mensaje de Flooding ha alcanzado el número máximo de hops: ${msg}`);
-                    }
-                    break;
-                case '2':
-                    console.log(`Link State Routing message recibido de ${msg.from}`);
-                    if (msg.hops < 10) {
-                        const lsr = new LinkStateRouting();
-                        lsr.configure(nodos, 'A');
-                        console.log(`Reenviando mensaje de LSR: ${msg}`);
-                        lsr.sendMessage(xmpp, msg, nombres, 'A');
-                    } else {
-                        console.log(`Mensaje de LSR ha alcanzado el número máximo de hops: ${msg}`);
-                    }
-                    break;
-                default:
-                    console.log('Tipo de mensaje no reconocido:', msg.type);
-            }
-        }
-        
-    } catch (error) {
-        console.error('Error al procesar el mensaje:', error);
+    if (algorithm === 'flooding') {
+        startFlooding(from, msg, nombres);
+    } else if (algorithm === 'lsr') {
+        const lsr = new LinkStateRouting();
+        lsr.configure(nodos, from);
+        lsr.sendMessage(xmpp, msg, nombres, from);
     }
+    console.log(`Mensaje enviado a ${to}: ${message}`);
 }
 
-module.exports = { iniciarAlgoritmo, procesarMensaje };
+// Evento online solo establece el cliente online, no invoca acciones directas
+xmpp.on('online', address => {
+    console.log(`Inicialmente conectado como ${address.toString()}`);
+    if (isNodeSelected) {
+        promptAction();
+    }
+});
+
+xmpp.on('error', err => {
+    console.error('Error en la conexión XMPP:', err);
+});
+
+// Asegurar que solo se inicia si no se ha seleccionado un nodo
+if (!isNodeSelected) {
+    promptNodo();
+}

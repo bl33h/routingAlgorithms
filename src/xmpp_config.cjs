@@ -16,8 +16,8 @@ const xmpp = client({
     service: 'ws://alumchat.lol:7070/ws/',
     domain: 'alumchat.lol',
     resource: '',
-    username: 'men21289-test',
-    password: 'test324'
+    username: 'men324v1',
+    password: '123'
 });
 
 //debug(xmpp, true);
