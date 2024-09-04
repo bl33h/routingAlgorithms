@@ -8,7 +8,7 @@
         - Melissa Pérez
 */
 
-const { client, xml } = require('@xmpp/client');
+const { xml, client } = require('@xmpp/client');
 const debug = require('@xmpp/debug');
 
 // Configuración del cliente XMPP
@@ -26,14 +26,20 @@ xmpp.on('error', err => {
     console.error('XMPP connection error:', err);
 });
 
-function sendMessage(destinationJID, message) {
-    const messageXML = xml('message', {
-        to: destinationJID,
-        type: 'chat',
-    }).c('body').t(JSON.stringify(message));
-
-    xmpp.send(messageXML).catch(err => console.error('Failed to send message:', err));
+function sendMessage(xmppClient, message) {
+    try {
+        // Ensure message.to and message.type are correctly defined
+        const messageXML = xml(
+            "message",
+            { type: 'chat', to: message.to },
+            xml("body", null, message.payload)
+        );
+        xmppClient.send(messageXML);
+    } catch (error) {
+        console.error('Failed to send message:', error);
+    }
 }
+
 
 module.exports = {
     xmpp,
