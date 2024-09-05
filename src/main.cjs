@@ -1,8 +1,17 @@
 const { client, xml } = require('@xmpp/client');
 const readline = require('readline');
 const flooding = require('./flooding.cjs');
-const lsr = require('./link_state_routing.cjs');
+const LinkStateRouting = require('./link_state_routing.cjs');
 const config = require('./xmpp_config.cjs');
+const fs = require('fs');
+const path = require('path');
+const topoConfigPath = path.join(__dirname, 'topo1-x-randomB-2024.txt');
+const namesConfigPath = path.join(__dirname, 'names1-x-randomB-2024.txt');
+
+const topoConfig = JSON.parse(fs.readFileSync(topoConfigPath, 'utf8'));
+const namesConfig = JSON.parse(fs.readFileSync(namesConfigPath, 'utf8'));
+const nombres = namesConfig.config;
+let nodos;
 
 // Interfaz para leer desde la terminal
 const rl = readline.createInterface({
@@ -10,6 +19,7 @@ const rl = readline.createInterface({
     output: process.stdout,
 });
 
+let actualNode;
 // Función para iniciar conexión XMPP
 function connectToNode(jid, password) {
     const xmpp = client({
@@ -33,10 +43,17 @@ function connectToNode(jid, password) {
 
     xmpp.on('stanza', (stanza) => {
         if (stanza.is('message')) {
-        const body = stanza.getChild('body');
-        if (body) {
-            console.log(`Mensaje recibido: ${body.getText()}`);
-        }
+            const body = stanza.getChild('body');
+            if (body) {
+                console.log(`Mensaje recibido: ${body}`);
+                const msg = JSON.parse(body.getText());
+                if (msg.type === 'lsr') {
+                    console.log(`Mensaje recibido de ${msg.from} con payload: ${msg.payload}`);
+                    const lsr = new LinkStateRouting();
+                    lsr.configure(nodos);
+                    lsr.sendMessage(xmpp, msg, nombres, actualNode);
+                }
+            }
         }
     });
 
@@ -54,6 +71,8 @@ function showMainMenu() {
     rl.question('Elige el algoritmo: 1. Flooding 2. LSR\n', (alg) => {
     if (alg === '1' || alg === '2') {
         rl.question('Elige el nodo (A, B, C, D, E, F):\n', (node) => {
+            nodos = topoConfig.config[node];
+            actualNode = node;
             node = node.toUpperCase();
             if (config[node]) {
                 rl.question('Introduce la contraseña del nodo:\n', (password) => {
@@ -65,7 +84,7 @@ function showMainMenu() {
                         targetNode = targetNode.toUpperCase();
                         if (config[targetNode]) {
                             rl.question('Escribe el mensaje:\n', (message) => {
-                            sendMessage(xmpp, config[targetNode], message, alg, node);
+                            sendMessage(xmpp, targetNode, message, alg, node);
                             });
                         } else {
                             console.log('Nodo destinatario inválido.');
@@ -94,19 +113,34 @@ function showMainMenu() {
 }
 
 // Función para enviar un mensaje
-function sendMessage(xmpp, targetJid, message, alg, node) {
-    const messageXML = xml('message', { type: 'chat', to: targetJid }, xml('body', {}, message));
-
+function sendMessage(xmpp, targetNode, message, alg, node) {
+    let messageJson;
     if (alg === '1') {
         console.log('Usando el algoritmo Flooding...');
-        flooding.startFlooding(xmpp, node, targetJid, message, config, config);
+        messageJson = {
+            type: 'flooding',
+            from: node,
+            to: targetNode,
+            hops: 0,
+            headers: {},
+            payload: message,
+        }
+        flooding.startFlooding(xmpp, node, targetNode, message, config, config);
     } else if (alg === '2') {
         console.log('Usando el algoritmo LSR...');
-        lsr.lsr(xmpp, node, targetJid, message);
-}
+        messageJson = {
+            type: 'lsr',
+            from: node,
+            to: targetNode,
+            hops: 0,
+            headers: {},
+            payload: message,
+        }
+        const lsr = new LinkStateRouting();
+        lsr.configure(nodos);
+        lsr.sendMessage(xmpp, messageJson, nombres, node);
 
-    xmpp.send(messageXML).catch(console.error);
-    console.log('Mensaje enviado.');
+}
     showMainMenu();
 }
 
@@ -115,8 +149,13 @@ function receiveMessages(xmpp) {
     xmpp.on('stanza', (stanza) => {
         if (stanza.is('message')) {
             const body = stanza.getChild('body');
-            if (body) {
-                console.log(`Mensaje recibido: ${body.getText()}`);
+            if (body.type === 'lsr') {
+                const message = JSON.parse(body.getText());
+                console.log(`Mensaje recibido de ${message.from} con payload: ${message.payload}`);
+
+                const lsr = new LinkStateRouting();
+                lsr.configure(nodos);
+                lsr.sendMessage(xmpp, message, nombres, node);
             }
         }
     });
