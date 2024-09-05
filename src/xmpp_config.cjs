@@ -26,25 +26,17 @@ xmpp.on('error', err => {
     console.error('XMPP connection error:', err);
 });
 
-function sendMessage(xmppClient, message) {
-    try {
-        // Ensure message.to and message.type are correctly defined
-        const messageXML = xml(
-            "message",
-            { type: 'chat', to: message.to },
-            xml("body", null, message.payload)
-        );
-        xmppClient.send(messageXML);
-    } catch (error) {
-        console.error('Failed to send message:', error);
-    }
+
+// Función para enviar un mensaje
+function sendMessage(xmpp, message) {
+  if (!message.to || !message.body) {
+    console.error('Error: Mensaje inválido. Falta destinatario o cuerpo.');
+    return;
+  }
+
+  const messageXML = xml('message', { type: 'chat', to: message.to }, xml('body', {}, message.body));
+  xmpp.send(messageXML).catch(console.error);
 }
-
-
-module.exports = {
-    xmpp,
-    sendMessage,
-};
 
 module.exports = {
     A: 'men324v1@alumchat.lol',
@@ -52,5 +44,6 @@ module.exports = {
     C: 'men324v3@alumchat.lol',
     D: 'men324v4@alumchat.lol',
     E: 'men324v5@alumchat.lol',
-    F: 'men324v6@alumchat.lol'
+    F: 'men324v6@alumchat.lol',
+    sendMessage
 };

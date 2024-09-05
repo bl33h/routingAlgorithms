@@ -20,14 +20,36 @@ function getAllNodes(excludeNodeID, names) {
     return Object.keys(names).filter(nodeID => nodeID !== excludeNodeID);
 }
 
+function generateMessageID(message) {
+    return `${message.to}:${message.body}:${message.hops}`;
+}
+
 function startFlooding(xmpp, fromNode, toNode, message, nodes, nombres) {
-    const nextNodes = nodes[fromNode];
+    const messageID = generateMessageID(message);
+
+    if (processedMessages.has(messageID)) {
+        console.log(`Mensaje ya procesado, no reenviar: ${messageID}`);
+        return;
+    }
+
+    processedMessages.add(messageID);
+    const nextNodes = getAllNodes(fromNode, nombres);
     console.log('Next nodes to receive message:', nextNodes);
 
-    Object.keys(nextNodes).forEach(node => {
-        const newMessage = { ...message, hops: message.hops + 1 };
-        newMessage.to = nombres[node];
+    if (!nextNodes.length) {
+        console.error('No se encontraron nodos para enviar el mensaje.');
+        return;
+    }
+
+    nextNodes.forEach(node => {
+        if (!nombres[node]) {
+            console.error(`Error: No se encontró un destino para el nodo ${node}`);
+            return;
+        }
+
+        const newMessage = { body: message.body || message, hops: (message.hops || 0) + 1, to: nombres[node] };
         console.log(`Sending message to ${node}:`, newMessage);
+
         sendMessage(xmpp, newMessage);
     });
 }
