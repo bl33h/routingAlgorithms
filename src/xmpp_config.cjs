@@ -45,3 +45,12 @@ module.exports = {
     xmpp,
     sendMessage,
 };
+
+module.exports = {
+    A: 'men324v1@alumchat.lol',
+    B: 'men324v2@alumchat.lol',
+    C: 'men324v3@alumchat.lol',
+    D: 'men324v4@alumchat.lol',
+    E: 'men324v5@alumchat.lol',
+    F: 'men324v6@alumchat.lol'
+};
