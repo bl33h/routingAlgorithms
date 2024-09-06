@@ -48,7 +48,10 @@ function connectToNode(jid, password) {
             if (body) {
                 if (msg.type === 'lsr') {
                     if (msg.to === actualNode) {
-                        console.log(`Mensaje recibido de ${msg.from} con payload: ${msg.payload}`);
+                        console.log(`Mensaje recibido de ${msg.from} con payload: ${msg.payload}
+                            Hops: ${msg.hops}
+                            Headers: ${msg.headers}
+                            `);
                     } else {
                         console.log(`Mensaje recibido de ${msg.from} con payload: ${msg.payload}`);
                         const lsr = new LinkStateRouting();
@@ -58,7 +61,10 @@ function connectToNode(jid, password) {
                 }
                 else if(msg.type === 'flooding'){
                     if(msg.to === actualNode){
-                        console.log(`Mensaje recibido de ${msg.from} con payload: ${msg.payload}`);
+                        console.log(`Mensaje recibido de ${msg.from} con payload: ${msg.payload}
+                                    Hops: ${msg.hops}
+                                    Headers: ${msg.headers}
+                                    `);
                     } else {
                         console.log(`Mensaje recibido de ${msg.from} con payload: ${msg.payload}`);
                         flooding.startFlooding(xmpp, nombres, msg, nodos[actualNode]);
