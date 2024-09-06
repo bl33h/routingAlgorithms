@@ -12,7 +12,7 @@ let processedMessages = new Set();
 
 
 function generateMessageID(message) {
-    return `${message.to}:${message.body}:${message.hops}`;
+    return `${message.to}:${message.payload}:${message.hops}`;
 }
 
 function startFlooding(xmpp, nombres, message, nodes) {
@@ -26,7 +26,7 @@ function startFlooding(xmpp, nombres, message, nodes) {
     processedMessages.add(messageID);
     
     console.log('Next nodes to receive message:', nodes);
-
+    message.hops++;
 
     for(const key in nodes) {
         if (key !== message.from) {

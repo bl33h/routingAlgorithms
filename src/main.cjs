@@ -166,7 +166,6 @@ async function sendMessage(xmpp, targetNode, message, alg, node) {
             payload: message,
         }
         flooding.startFlooding(xmpp, nombres, messageJson, nodos[node]);
-        process.exit(0);
     } else if (alg === '2') {
         routingTable(xmpp);
         await waitForUserInput();
@@ -183,7 +182,8 @@ async function sendMessage(xmpp, targetNode, message, alg, node) {
             payload: message,
         }
         lsr.sendMessage(xmpp, messageJson, nombres, node);
-        process.exit(0);
+        
+
     }
 }
 
