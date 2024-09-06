@@ -56,6 +56,14 @@ function connectToNode(jid, password) {
                         lsr.sendMessage(xmpp, msg, nombres, actualNode);
                     }
                 }
+                else if(msg.type === 'flooding'){
+                    if(msg.to === actualNode){
+                        console.log(`Mensaje recibido de ${msg.from} con payload: ${msg.payload}`);
+                    } else {
+                        console.log(`Mensaje recibido de ${msg.from} con payload: ${msg.payload}`);
+                        flooding.startFlooding(xmpp, nombres, msg, nodos[actualNode]);
+                    }
+                }
                 else if(msg.type === 'info'){
                     // process the info the node gets
                     const info = msg.payload;
@@ -157,7 +165,7 @@ async function sendMessage(xmpp, targetNode, message, alg, node) {
             headers: {},
             payload: message,
         }
-        flooding.startFlooding(xmpp, node, targetNode, message, config, config);
+        flooding.startFlooding(xmpp, nombres, messageJson, nodos[node]);
     } else if (alg === '2') {
         routingTable(xmpp);
         await waitForUserInput();
