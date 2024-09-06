@@ -12,7 +12,7 @@ let processedMessages = new Set();
 
 
 function generateMessageID(message) {
-    return `${message.to}:${message.payload}:${message.hops}`;
+    return `${message.to}:${message.payload}`;
 }
 
 function startFlooding(xmpp, nombres, message, nodes) {
